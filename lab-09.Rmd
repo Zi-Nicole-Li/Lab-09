@@ -1,7 +1,7 @@
 ---
 title: "Lab 09 - Grading the professor, Pt. 1"
-author: "Insert your name here"
-date: "Insert date here"
+author: "Zi Li"
+date: "3/24/2025"
 output: github_document
 ---
 
@@ -9,33 +9,126 @@ output: github_document
 
 ```{r load-packages, message=FALSE}
 library(tidyverse) 
-library(tidymodels)
+library(broom)
 library(openintro)
+
+?evals
+
 ```
 
 ## Exercise 1
 
-*Provide your answer here.*  
-Add code chunks as needed. Don't forget to label your code chunks.
+```{r exercise part1_code}
 
+ggplot(evals, aes(x = score)) +
+  geom_histogram(binwidth = 0.1, fill = "skyblue", color = "black")
+# Slight Left-Skewed. The majority of students' ratings were centered between ～ 3.5 - 5. The rating of ~ 4.2 - 5 was given by the largest number. I think this is to be expected, as I rated my professor between 4 or 5 as an undergraduate.
 
-```{r exercise1_code}
-# Add your R code here
+summary(evals$score)
+
+# Visualize and describe the relationship between score and the variable bty_avg, a professor’s average beauty rating.
+ggplot(evals, aes(x = bty_avg, y = score)) +
+  geom_point()
+# this plot⬆️ is kinda messy. 
+
+ggplot(evals, aes(x = bty_avg, y = score)) +
+  geom_jitter(width = 0.2, height = 0.1)
+# Now we see that the high beauty average does get some high ratings, but not a lot. Most of the points are still centered between beatuy average of 3 - 5 with a score of 3.5 - 5. 
+
+# geom_jitter give us a better view of the overlapping data points; the initial plot is misleading because a lot of plots overlap on each others, make it harder to see a trend. 
 ```
 
 ## Exercise 2
 
-*Provide your answer here.*  
-Add code chunks as needed.
+```{r exercise Part2_code}
+m_bty <- lm(score ~ bty_avg, data = evals)
+summary(m_bty)
 
-```{r exercise2_code}
-# Add your R code here
+# score(hat)=3.88034 + 0.06664 x bty_avg
+
+# The regression model predicting evaluation score from beauty rating was statistically significant, F(1, 461) = 16.73, p < .001. The model explained 3.5% of the variance in scores. The slope (b = 0.067) indicates that each additional point in beauty rating is associated with a 0.067-point increase in evaluation score.
+
+# note, even though beauty significantly predicts evaluation scores, the effect size is small — most of the variation is explained by other factors. (thats what I thought)
+
+ggplot(evals, aes(x = bty_avg, y = score)) +
+  geom_point()
+
+# remove.packages("tidyverse");install.packages("tidyverse")
+# ⬆️. I got a error message saying: Error in base::nchar(wide_chars$test, type = "width") : promise already under evaluation: recursive default argument reference or earlier problems?
+# after couple trouble shot, some smart people on internet said, remove tidyverse and reinstall, it would work. it did!!
+
+ggplot(evals, aes(x = bty_avg, y = score)) +
+  geom_jitter(width = 0.2, height = 0.1) +
+  geom_smooth(aes(x = bty_avg, y = score), method = "lm", color = "orange", se = FALSE) 
+
+# the plot is not what I thought, it feels a little sketchy... But it can still be interpreted. 
+# For every 1-point increase in average beauty rating, the professor’s evaluation score increases by 0.067 points on average.
+
+# And the intercept (3.88) represents the predicted score when bty_avg = 0.
+# Mathematically, the expected score would be 3.88 if a professor had a beauty rating of zero. but it doesn't make sense here, no one got the beauty rating that low (not in my data tho).  
+
+# with R-squared = 0.03502; it indicated that about 3.5% of the variability in professor evaluation scores is explained by the professor's average beauty rating.
+# The remaining 96.5% of the variation is due to other factors not captured by this model. 
+
 ```
 
-## Additional Exercises
+## Exercises 3
 
-*Repeat the format above for additional exercises.*
+```{r exercises Part3 code}
+m_gen <- lm(score ~ gender, data = evals)
+summary(m_gen)
 
-## Hint
+levels(evals$gender)
 
-For Exercise 12, the `relevel()` function can be helpful!
+# Male: score(hat)= 4.09282 + 0.14151 × 1=4.23433
+# Female: score(hat)= 4.09282 + 0.14151 × 0=4.09282
+
+m_rank <- lm(score ~ rank, data = evals)
+summary(m_rank)
+levels(evals$rank)
+
+# score(hat)= 4.28431 − 0.12968 × tenure track − 0.14518 × tenured
+
+# The intercept is the predicted average evaluation score for teaching faculty (with an average score of 4.28).
+# Tenure-track professors score 0.13 points lower on average than teaching faculty, but this difference is not significant yet approaching (p = 0.084).
+# Tenured professors score 0.15 points lower on average than teaching faculty.This difference is significant (p = 0.023).
+
+# About 1.16% of the variance in evaluation scores is explained by rank.
+
+evals <- evals %>%
+  mutate(rank_relevel = fct_relevel(rank, "tenure track"))
+
+m_rank_relevel <- lm(score ~ rank_relevel, data = evals)
+summary(m_rank_relevel) # Seriously, things get a little complicated once you done a lot modeling; trying to wrangling my head around this..
+
+# score(hat) = 4.15463 + 0.12968(teaching) − 0.01550(tenured)
+
+# The expected evaluation score for tenure track faculty is 4.15.
+
+# Teaching faculty score 0.13 points higher than tenure track faculty, but this difference is only approaching significance and yet not significant (p= 0.084).
+# Tenured professors score slightly lower (- 0.016 points), and this difference is not significant (p= 0.804).
+
+# 1.16% of the variability in evaluation scores is explained by releveled professor rank.
+
+
+```
+## Exercises 3- continued
+
+```{r Ex_Part3}
+evals <- evals %>%
+  mutate(tenure_eligible = if_else(rank == "teaching", "no", "yes"))
+
+m_tenure_eligible <- lm(score ~ tenure_eligible, data = evals)
+summary(m_tenure_eligible)
+
+# score(hat)= 4.2843 − 0.1406 × tenure_eligible
+
+# teaching faculty (Professors not eligible for tenure) have an average predicted evaluation score of 4.28.
+# tenure-track or tenured professors receive evaluation scores of 0.14 points lower on average than teaching faculty. This result is significant with p = 0.021.
+
+# About 1.15% of the variance in evaluation scores is explained by tenure eligibility.
+# Being tenure-eligible vs. teaching faclty explains 1.15% difference in scores/ tenure eligibility has 1.15% yet significant effect on evaluation ratings.
+
+```
+
+
